@@ -55,6 +55,11 @@ int main(int argc, char **argv) {
                         // event->name);
                     } else {
                         printf("The file %s was created.\n", event->name);
+                        char buf[200];
+
+                        sprintf(buf, "notify-send \"New device %s!\"",
+                                event->name);
+                        system(buf);
                     }
                 }
 

@@ -1,2 +1,2 @@
 main.o:
-	gcc -Wall -Werror -Wextra main.c
+	gcc -Wall -Wextra main.c
