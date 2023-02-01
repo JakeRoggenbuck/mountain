@@ -86,35 +86,24 @@ struct Args parse(int argc, char **argv) {
     return args;
 }
 
-int main(int argc, char **argv) {
+void run(struct Args *args) {
     int length, i = 0, wd;
     int fd;
     char buffer[BUF_LEN];
-
-    struct Args args = parse(argc, argv);
-
-    switch (args.option) {
-    case HELP:
-        help();
-        break;
-    case VERSION:
-        version();
-        break;
-    }
 
     fd = inotify_init();
     if (fd < 0) {
         print_and_exit("Couldn't initialize inotify.\n");
     }
 
-    wd = inotify_add_watch(fd, args.filename, IN_CREATE);
+    wd = inotify_add_watch(fd, args->filename, IN_CREATE);
 
-    if (args.verbose) {
+    if (args->verbose) {
         if (wd == -1) {
-            printf("Couldn't add watch to \"%s\"\n", args.filename);
+            printf("Couldn't add watch to \"%s\"\n", args->filename);
             exit(1);
         } else {
-            printf("Watching \"%s\"\n", args.filename);
+            printf("Watching \"%s\"\n", args->filename);
         }
     }
 
@@ -134,7 +123,7 @@ int main(int argc, char **argv) {
                         // printf("The directory %s was created.\n",
                         // event->name);
                     } else {
-                        if (args.verbose) {
+                        if (args->verbose) {
                             printf("The file %s was created.\n", event->name);
                         }
                         char buf[200];
@@ -152,6 +141,22 @@ int main(int argc, char **argv) {
 
     inotify_rm_watch(fd, wd);
     close(fd);
+}
+
+int main(int argc, char **argv) {
+    struct Args args = parse(argc, argv);
+
+    switch (args.option) {
+    case HELP:
+        help();
+        break;
+    case VERSION:
+        version();
+        break;
+    case RUN:
+        run(&args);
+        break;
+    }
 
     return 0;
 }
