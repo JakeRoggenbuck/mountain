@@ -132,19 +132,6 @@ void run(struct Args *args) {
                                 event->name);
                         system(buf);
                     }
-                } else if (event->mask & IN_DELETE) {
-                    if (event->mask & IN_ISDIR) {
-                        printf("The directory %s was created.\n", event->name);
-                    } else {
-                        if (args->verbose) {
-                            printf("The file %s was deleted.\n", event->name);
-                        }
-                        char buf[200];
-
-                        sprintf(buf, "notify-send \"Device removed %s.\"",
-                                event->name);
-                        system(buf);
-                    }
                 }
 
                 i += EVENT_SIZE + event->len;
@@ -157,7 +144,6 @@ void run(struct Args *args) {
 }
 
 int main(int argc, char **argv) {
-
     struct Args args = parse(argc, argv);
 
     switch (args.option) {
