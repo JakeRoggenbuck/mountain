@@ -1,7 +1,10 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -9,6 +12,8 @@
 #define LEN_NAME 16
 #define EVENT_SIZE (sizeof(struct inotify_event))
 #define BUF_LEN (MAX_EVENTS * (EVENT_SIZE + LEN_NAME))
+
+#define DEBUG(text) printf(text)
 
 void print_and_exit(const char *msg) {
     printf(msg);
@@ -86,6 +91,51 @@ struct Args parse(int argc, char **argv) {
     return args;
 }
 
+void on_create(struct Args *args, struct inotify_event *event) {
+    char foundfile[200];
+    char newfile[200];
+    int did_make_dir;
+    struct stat st = {0};
+
+    // Create filepath of device
+    sprintf(foundfile, "%s/%s", args->filename, event->name);
+
+    // Create mounting point
+    sprintf(newfile, "/tmp/%s-mountain", event->name);
+
+    // Check if directory already exists
+    if (stat(newfile, &st) == -1) {
+        did_make_dir = (mkdir(newfile, 0700) == 0);
+
+        if (args->verbose) {
+            if (did_make_dir) {
+                printf("Created new directory: %s.\n", newfile);
+            } else {
+                printf("Error creating directory: %s.\n", newfile);
+            }
+        }
+    }
+
+    if (args->verbose) {
+        printf("Created %s.\n", newfile);
+    }
+
+    // Check that it's a drive - temporary
+    if (event->name[0] == 's' && event->name[1] == 'd') {
+        // Mount the drive
+        if (mount(foundfile, newfile, "vfat", MS_NOATIME, NULL)) {
+            if (errno == EBUSY) {
+                printf("Mountpoint busy.\n");
+            } else {
+                printf("Mount error: %s.\n", strerror(errno));
+                printf("%d\n", errno);
+            }
+        } else {
+            printf("Mount successful.\n");
+        }
+    }
+}
+
 void run(struct Args *args) {
     int length, i = 0, wd;
     int fd;
@@ -119,18 +169,12 @@ void run(struct Args *args) {
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             if (event->len) {
                 if (event->mask & IN_CREATE) {
-                    if (event->mask & IN_ISDIR) {
-                        // printf("The directory %s was created.\n",
-                        // event->name);
-                    } else {
+                    // Is a file being created
+                    if (!(event->mask & IN_ISDIR)) {
                         if (args->verbose) {
                             printf("The file %s was created.\n", event->name);
                         }
-                        char buf[200];
-
-                        sprintf(buf, "notify-send \"New device %s!\"",
-                                event->name);
-                        system(buf);
+                        on_create(args, event);
                     }
                 }
 
