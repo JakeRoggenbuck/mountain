@@ -126,10 +126,8 @@ void run(struct Args *args) {
             struct inotify_event *event = (struct inotify_event *)&buffer[i];
             if (event->len) {
                 if (event->mask & IN_CREATE) {
-                    if (event->mask & IN_ISDIR) {
-                        // printf("The directory %s was created.\n",
-                        // event->name);
-                    } else {
+                    // Is a file being created
+                    if (!(event->mask & IN_ISDIR)) {
                         if (args->verbose) {
                             printf("The file %s was created.\n", event->name);
                         }
