@@ -1,7 +1,10 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -9,6 +12,8 @@
 #define LEN_NAME 16
 #define EVENT_SIZE (sizeof(struct inotify_event))
 #define BUF_LEN (MAX_EVENTS * (EVENT_SIZE + LEN_NAME))
+
+#define DEBUG(text) printf(text)
 
 void print_and_exit(const char *msg) {
     printf(msg);
@@ -86,11 +91,38 @@ struct Args parse(int argc, char **argv) {
     return args;
 }
 
-void on_create(struct inotify_event *event) {
-    char buf[200];
+void on_create(struct Args *args, struct inotify_event *event) {
+    char foundfile[200];
+    char newfile[200];
+    struct stat st = {0};
 
-    sprintf(buf, "notify-send \"New device %s!\"", event->name);
-    system(buf);
+    // Create filepath of device
+    sprintf(foundfile, "%s/%s", args->filename, event->name);
+
+    // Create mounting point
+    sprintf(newfile, "/mnt/%s-mountain", event->name);
+
+    if (stat(newfile, &st) == -1) {
+        mkdir(newfile, 0700);
+    }
+
+    if (args->verbose) {
+        printf("Created %s.\n", newfile);
+    }
+
+	// Check that it's a drive - temporary
+    if (strcmp("sda", event->name) == 0) {
+		// Mount the drive
+        if (mount(foundfile, newfile, "vfat", MS_NOATIME, NULL)) {
+            if (errno == EBUSY) {
+                printf("Mountpoint busy\n");
+            } else {
+                printf("Mount error: %s\n", strerror(errno));
+            }
+        } else {
+            printf("Mount successful\n");
+        }
+    }
 }
 
 void run(struct Args *args) {
@@ -131,7 +163,7 @@ void run(struct Args *args) {
                         if (args->verbose) {
                             printf("The file %s was created.\n", event->name);
                         }
-                        on_create(event);
+                        on_create(args, event);
                     }
                 }
 
