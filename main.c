@@ -143,6 +143,9 @@ void on_create(struct Args *args, struct inotify_event *event) {
                            "unless you are root.\n");
                 } else {
                     printf("Mount error: %s.\n", strerror(errno));
+                    if (args->verbose) {
+                        printf("Mount error number: %d.\n", errno);
+                    }
                 }
             } else {
                 printf("Mount successful.\n");
