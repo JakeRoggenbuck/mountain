@@ -27,7 +27,8 @@ META OPTIONS\n\
 DISPLAY OPTIONS\n\
 	-V, --verbose\t\tVerbose output\n\n\
 FEATURE OPTIONS\n\
-	-m, --mount\t\tAutomatically mount drives when found\n");
+	-m, --mount\t\tAutomatically mount drives when found\n\
+	-n, --notify\t\tSend a notify-send message when a drive is mounted\n");
 }
 
 void version() { print_and_exit("mountain 0.0.1\n"); }
@@ -39,12 +40,22 @@ struct Args {
     char *filename;
     enum Option option;
     int mount;
+    int notify;
 };
 
 void debug_args(struct Args *args) {
     printf("verbose: %d\n", args->verbose);
     printf("filename: %s\n", args->filename);
     printf("option: %d\n", args->option);
+}
+
+void notify(char *device_name) {
+    /* char buf[200]; */
+
+    /* sprintf(buf, "notify-send \"Mounted device: %s\"", device_name); */
+    /* system(buf); */
+
+    system("notify-send \"Mounted device.\"");
 }
 
 int does_match(char *in, char *short_, char *long_) {
@@ -59,6 +70,7 @@ struct Args parse(int argc, char **argv) {
     args.option = RUN;
     args.verbose = 0;
     args.mount = 0;
+    args.notify = 0;
 
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
@@ -78,6 +90,10 @@ struct Args parse(int argc, char **argv) {
 
             if (does_match(argv[i], "-m", "--mount")) {
                 args.mount = 1;
+            }
+
+            if (does_match(argv[i], "-n", "--notify")) {
+                args.notify = 1;
             }
         } else {
             // Only accept the first non-flag as a file
@@ -100,6 +116,8 @@ struct Args parse(int argc, char **argv) {
                 "Permission Error: mountain needs root to mount drives.\n");
         }
     }
+
+    // TODO: check that notify executable exists if notify is on
 
     return args;
 }
@@ -150,6 +168,10 @@ void on_create(struct Args *args, struct inotify_event *event) {
             } else {
                 printf("Mount successful.\n");
                 printf("Finished: %s -> %s\n", foundfile, newfile);
+
+                if (args->notify) {
+                    notify(event->name);
+                }
             }
         }
     } else {
