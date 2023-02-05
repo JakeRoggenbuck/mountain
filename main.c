@@ -13,8 +13,6 @@
 #define EVENT_SIZE (sizeof(struct inotify_event))
 #define BUF_LEN (MAX_EVENTS * (EVENT_SIZE + LEN_NAME))
 
-#define DEBUG(text) printf(text)
-
 void print_and_exit(const char *msg) {
     printf(msg);
     exit(1);
@@ -27,7 +25,9 @@ META OPTIONS\n\
 	-h, --help\t\tShow this page\n\
 	-v, --version\t\tShow the version and exit\n\n\
 DISPLAY OPTIONS\n\
-	-V, --verbose\t\tVerbose output\n");
+	-V, --verbose\t\tVerbose output\n\n\
+FEATURE OPTIONS\n\
+	-m, --mount\t\tAutomatically mount drives when found\n");
 }
 
 void version() { print_and_exit("mountain 0.0.1\n"); }
@@ -38,6 +38,7 @@ struct Args {
     int verbose;
     char *filename;
     enum Option option;
+    int mount;
 };
 
 void debug_args(struct Args *args) {
@@ -57,6 +58,7 @@ struct Args parse(int argc, char **argv) {
 
     args.option = RUN;
     args.verbose = 0;
+    args.mount = 0;
 
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
@@ -73,6 +75,10 @@ struct Args parse(int argc, char **argv) {
             if (does_match(argv[i], "-V", "--verbose")) {
                 args.verbose = 1;
             }
+
+            if (does_match(argv[i], "-m", "--mount")) {
+                args.mount = 1;
+            }
         } else {
             // Only accept the first non-flag as a file
             if (!has_file) {
@@ -86,6 +92,13 @@ struct Args parse(int argc, char **argv) {
 
     if (args.filename == NULL || argc < 2) {
         help();
+    }
+
+    if (args.mount) {
+        if (geteuid() != 0) {
+            print_and_exit(
+                "Permission Error: mountain needs root to mount drives.\n");
+        }
     }
 
     return args;
@@ -103,35 +116,42 @@ void on_create(struct Args *args, struct inotify_event *event) {
     // Create mounting point
     sprintf(newfile, "/tmp/%s-mountain", event->name);
 
-    // Check if directory already exists
-    if (stat(newfile, &st) == -1) {
-        did_make_dir = (mkdir(newfile, 0700) == 0);
+    if (args->mount) {
+        // Check that it's a drive - TODO: temporary
+        if (event->name[0] == 's' && event->name[1] == 'd') {
 
-        if (args->verbose) {
-            if (did_make_dir) {
-                printf("Created new directory: %s.\n", newfile);
+            // Check if directory already exists
+            if (stat(newfile, &st) == -1) {
+                did_make_dir = (mkdir(newfile, 0700) == 0);
+
+                if (args->verbose) {
+                    if (did_make_dir) {
+                        printf("Created new directory: %s.\n", newfile);
+                    } else {
+                        printf("Error creating directory: %s.\n", newfile);
+                    }
+                }
+            }
+
+            // Mount the drive
+            printf("Attempting: %s -> %s\n", foundfile, newfile);
+            if (mount(foundfile, newfile, "vfat", MS_NOATIME, NULL)) {
+                if (errno == EBUSY) {
+                    printf("Mount error: mountpoint busy.\n");
+                } else if (errno == EPERM) {
+                    printf("Mount error: you cannot perform this operation "
+                           "unless you are root.\n");
+                } else {
+                    printf("Mount error: %s.\n", strerror(errno));
+                }
             } else {
-                printf("Error creating directory: %s.\n", newfile);
+                printf("Mount successful.\n");
+                printf("Finished: %s -> %s\n", foundfile, newfile);
             }
         }
-    }
-
-    if (args->verbose) {
-        printf("Created %s.\n", newfile);
-    }
-
-    // Check that it's a drive - temporary
-    if (event->name[0] == 's' && event->name[1] == 'd') {
-        // Mount the drive
-        if (mount(foundfile, newfile, "vfat", MS_NOATIME, NULL)) {
-            if (errno == EBUSY) {
-                printf("Mountpoint busy.\n");
-            } else {
-                printf("Mount error: %s.\n", strerror(errno));
-                printf("%d\n", errno);
-            }
-        } else {
-            printf("Mount successful.\n");
+    } else {
+        if (args->verbose) {
+            printf("Info: Found drive, but mount is off.\n");
         }
     }
 }
