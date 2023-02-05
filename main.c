@@ -86,6 +86,13 @@ struct Args parse(int argc, char **argv) {
     return args;
 }
 
+void on_create(struct inotify_event *event) {
+    char buf[200];
+
+    sprintf(buf, "notify-send \"New device %s!\"", event->name);
+    system(buf);
+}
+
 void run(struct Args *args) {
     int length, i = 0, wd;
     int fd;
@@ -126,11 +133,7 @@ void run(struct Args *args) {
                         if (args->verbose) {
                             printf("The file %s was created.\n", event->name);
                         }
-                        char buf[200];
-
-                        sprintf(buf, "notify-send \"New device %s!\"",
-                                event->name);
-                        system(buf);
+                        on_create(event);
                     }
                 }
 
