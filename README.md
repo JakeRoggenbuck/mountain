@@ -1,4 +1,4 @@
-# mountain
+# mountain - lightweight tool to auto mount drives with inotify
 1. Use sys/inotify to listen for new files in /dev/
 2. Notify the user that such file has been created
 3. Mount the drive listed
